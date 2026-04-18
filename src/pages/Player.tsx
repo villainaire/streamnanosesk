@@ -477,7 +477,9 @@ export default function Player() {
 
   // 4. Universal Synchronization (Follow Master)
   useEffect(() => {
-    if (!masterControl || !playbackStatus || !videos.length) return;
+    // Only followers (non-admins) should auto-seek to master time
+    // Admins are 'Reporters' who drive the master time
+    if (!masterControl || !playbackStatus || !videos.length || appUser?.role === 'admin') return;
 
     // Determine current local time
     let localTime = 0;
@@ -513,7 +515,7 @@ export default function Player() {
         videoElementRef.current.currentTime = adjustedMasterTime;
       }
     }
-  }, [masterControl, playbackStatus?.index, playbackStatus?.time]);
+  }, [masterControl, playbackStatus?.index, playbackStatus?.time, currentIndex, currentVideo, videos.length, appUser]);
 
   useEffect(() => {
     // ONLY the owner or an admin should report status to the master console

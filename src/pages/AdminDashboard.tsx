@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../hooks/useAuth";
 import { Plus, Trash2, ExternalLink, Tv, Radio, Edit2, LayoutGrid, Monitor, LayoutList } from "lucide-react";

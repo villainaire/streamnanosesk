@@ -22,10 +22,11 @@ interface LivePreviewProps {
     updatedAt: any;
   };
   onSeek?: (time: number) => void;
+  onTimeUpdate?: (time: number) => void;
   showControls?: boolean;
 }
 
-export default function LivePreview({ video, status, onSeek, showControls = true }: LivePreviewProps) {
+export default function LivePreview({ video, status, onSeek, onTimeUpdate, showControls = true }: LivePreviewProps) {
   const ytPlayerRef = useRef<any>(null);
   const videoElementRef = useRef<HTMLVideoElement>(null);
   const [playerReady, setPlayerReady] = useState(false);
@@ -103,7 +104,33 @@ export default function LivePreview({ video, status, onSeek, showControls = true
       videoElementRef.current.play().catch(() => {});
     }
 
+    // Force re-parse for Facebook XFBML
+    if (video.type === 'fb' && (window as any).FB) {
+      setTimeout(() => (window as any).FB.XFBML.parse(), 100);
+    }
+
   }, [video?.id, video?.type, video?.val]);
+
+  // Status Reporting Loop (for Master Control Room)
+  useEffect(() => {
+    if (!onTimeUpdate) return;
+
+    const report = () => {
+      let currentTime = 0;
+      if (video?.type === 'yt' && ytPlayerRef.current && ytPlayerRef.current.getCurrentTime) {
+        currentTime = ytPlayerRef.current.getCurrentTime();
+      } else if (video?.type === 'generic' && videoElementRef.current) {
+        currentTime = videoElementRef.current.currentTime;
+      }
+      
+      if (currentTime > 0) {
+        onTimeUpdate(currentTime);
+      }
+    };
+
+    const interval = setInterval(report, 2000);
+    return () => clearInterval(interval);
+  }, [video?.id, onTimeUpdate]);
 
   return (
     <div className="w-full h-full relative group bg-black">
