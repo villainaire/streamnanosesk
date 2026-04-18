@@ -108,31 +108,31 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-8 py-8 md:py-12">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12 md:mb-16">
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-             <div className="w-12 h-0.5 bg-red-600" />
+             <div className="w-8 md:w-12 h-0.5 bg-red-600" />
              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-red-500">Dashboard Area</span>
           </div>
-          <h1 className="text-6xl font-black italic uppercase tracking-tighter leading-none">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black italic uppercase tracking-tighter leading-none">
             {viewMode === 'grid' ? 'Active ' : 'Command '}
             <span className="text-zinc-600 italic">{viewMode === 'grid' ? 'Stations' : 'Center'}</span>
           </h1>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
           {/* View Toggle */}
-          <div className="bg-zinc-900/50 p-1.5 rounded-2xl border border-white/5 flex items-center gap-1">
+          <div className="bg-zinc-900/50 p-1.5 rounded-2xl border border-white/5 flex items-center gap-1 w-full sm:w-auto">
              <button 
                onClick={() => setViewMode('grid')}
-               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'grid' ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'grid' ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}
              >
                <LayoutList className="w-3.5 h-3.5" /> Station List
              </button>
              <button 
                onClick={() => setViewMode('command')}
-               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'command' ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'command' ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}
              >
                <Monitor className="w-3.5 h-3.5" /> Command Center
              </button>
@@ -141,7 +141,7 @@ export default function AdminDashboard() {
           {appUser?.role === 'admin' && (
             <button
               onClick={() => setIsAdding(true)}
-              className="flex items-center gap-3 bg-white text-black font-black py-4 px-8 rounded-2xl transition-all shadow-2xl hover:scale-105 active:scale-95 group"
+              className="flex items-center justify-center gap-3 bg-white text-black font-black py-4 px-8 rounded-2xl transition-all shadow-2xl hover:scale-105 active:scale-95 group w-full sm:w-auto shrink-0"
             >
               <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" /> Create New Feed
             </button>
@@ -345,7 +345,7 @@ export default function AdminDashboard() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
-            className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-10"
+            className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-10"
           >
             {channels.map((channel) => (
               <ChannelMonitor key={channel.id} channel={channel} />
@@ -391,22 +391,22 @@ function ChannelMonitor({ channel }: { channel: Channel }) {
   }, [channel.id, channel.playbackStatus?.index]);
 
   return (
-    <div className="bg-zinc-900 border border-white/5 rounded-[40px] overflow-hidden flex flex-col shadow-2xl">
-      <div className="p-6 border-b border-white/5 flex items-center justify-between bg-zinc-900/80 backdrop-blur-md">
-        <div className="flex items-center gap-4">
-           <div className="w-10 h-10 bg-black rounded-2xl flex items-center justify-center border border-white/5">
-             <Tv className="w-5 h-5 text-red-600" />
+    <div className="bg-zinc-900 border border-white/5 rounded-[32px] md:rounded-[40px] overflow-hidden flex flex-col shadow-2xl">
+      <div className="p-4 md:p-6 border-b border-white/5 flex items-center justify-between bg-zinc-900/80 backdrop-blur-md">
+        <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+           <div className="w-8 h-8 md:w-10 md:h-10 bg-black rounded-xl md:rounded-2xl flex items-center justify-center border border-white/5 shrink-0">
+             <Tv className="w-4 h-4 md:w-5 md:h-5 text-red-600" />
            </div>
-           <div>
-             <h3 className="text-lg font-black italic uppercase tracking-tighter leading-none">{channel.name}</h3>
-             <p className="text-[9px] font-black uppercase text-zinc-500 tracking-widest mt-1">Live Feed v1.4</p>
+           <div className="min-w-0">
+             <h3 className="text-base md:text-lg font-black italic uppercase tracking-tighter leading-none truncate">{channel.name}</h3>
+             <p className="text-[8px] md:text-[9px] font-black uppercase text-zinc-500 tracking-widest mt-1">Live Feed v1.4</p>
            </div>
         </div>
         <Link 
           to={`/admin/channel/${channel.id}`}
-          className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all"
+          className="p-2 md:p-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg md:rounded-xl transition-all shrink-0"
         >
-          <Edit2 className="w-4 h-4 text-zinc-400" />
+          <Edit2 className="w-3.5 h-3.5 md:w-4 md:h-4 text-zinc-400" />
         </Link>
       </div>
 

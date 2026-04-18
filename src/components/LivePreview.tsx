@@ -71,12 +71,15 @@ export default function LivePreview({ video, status, onSeek, onTimeUpdate, showC
               autoplay: 1, 
               controls: 0, 
               modestbranding: 1, 
+              mute: 1,
+              playsinline: 1,
               start: Math.floor(status.time),
               origin: window.location.origin
             },
             events: {
               onReady: (event: any) => { 
                 event.target.mute();
+                event.target.playVideo();
                 setPlayerReady(true);
               },
               onError: () => setError("YT Signal Error")
@@ -101,7 +104,9 @@ export default function LivePreview({ video, status, onSeek, onTimeUpdate, showC
     if (video.type === 'generic' && videoElementRef.current) {
       videoElementRef.current.load();
       videoElementRef.current.currentTime = status.time;
-      videoElementRef.current.play().catch(() => {});
+      videoElementRef.current.play().catch((err) => {
+        console.warn("Autoplay blocked:", err);
+      });
     }
 
     // Force re-parse for Facebook XFBML
@@ -179,6 +184,7 @@ export default function LivePreview({ video, status, onSeek, onTimeUpdate, showC
            src={video.val} 
            autoPlay 
            muted 
+           playsInline
            className="w-full h-full object-contain"
            onLoadedMetadata={(e: any) => {
              e.target.currentTime = status.time;
