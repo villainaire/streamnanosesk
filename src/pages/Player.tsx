@@ -261,23 +261,37 @@ export default function Player() {
     };
   }, []);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     const curV = videosRef.current[currentIndexRef.current];
     if (curV?.loopVideo) {
       setPlayCount(c => c + 1);
       return;
     }
     
-    setCurrentIndex((p) => {
-      if (p === videosRef.current.length - 1) {
-        if (loopPlaylistRef.current) {
-          setPlayCount(c => c + 1);
-          return 0;
-        }
-        return p;
+    let nextIndex = currentIndexRef.current;
+    if (currentIndexRef.current === videosRef.current.length - 1) {
+      if (loopPlaylistRef.current) {
+        nextIndex = 0;
       }
-      return p + 1;
-    });
+    } else {
+      nextIndex = currentIndexRef.current + 1;
+    }
+
+    if (nextIndex !== currentIndexRef.current) {
+      setCurrentIndex(nextIndex);
+      setPlayCount(c => c + 1);
+      
+      // If we are NOT in master control mode, we update the DB so others follow our autonomous progress
+      if (!masterControl && channelId) {
+        await updateDoc(doc(db, "channels", channelId), {
+          playbackStatus: {
+            index: nextIndex,
+            time: videosRef.current[nextIndex]?.startTime || 0,
+            updatedAt: serverTimestamp()
+          }
+        });
+      }
+    }
   };
 
   const handleRefreshPlaylist = () => {
@@ -475,11 +489,17 @@ export default function Player() {
     }
   }, [targetVideoId, videos]);
 
-  // 4. Universal Synchronization (Follow Master)
+  // 4. Universal Synchronization (Follow the Leader)
   useEffect(() => {
-    // Only followers (non-admins) should auto-seek to master time
-    // Admins are 'Reporters' who drive the master time
-    if (!masterControl || !playbackStatus || !videos.length || appUser?.role === 'admin') return;
+    // Determine if we should be following or leading
+    // Leading conditions:
+    // a. We are admin AND masterControl is OFF (Autonomous Player Leader)
+    // b. We are NOT admin (Follower)
+    // Actually, simply: If I'm NOT driving the reporting, I should be following.
+    
+    // Condition to skip following (we be the leader):
+    const isStationLeader = appUser?.role === 'admin' && !masterControl;
+    if (isStationLeader || !playbackStatus || !videos.length) return;
 
     // Determine current local time
     let localTime = 0;
@@ -499,14 +519,14 @@ export default function Player() {
       return;
     }
 
-    // 2. Check Drift (Allow 6 seconds gap for network latency)
+    // 2. Check Drift
     const now = Date.now();
     const recordedAt = updatedAt?.toMillis() || now;
     const driftSeconds = (now - recordedAt) / 1000;
-    const adjustedMasterTime = time + driftSeconds;
+    const adjustedMasterTime = time + (driftSeconds > 0 ? driftSeconds : 0);
 
     if (Math.abs(localTime - adjustedMasterTime) > 7) {
-      console.log("Universal Sync: Seeking to master time", adjustedMasterTime);
+      console.log("Universal Sync: Adjusting to match leader", adjustedMasterTime);
       if (currentVideo?.type === 'yt' && ytPlayerRef.current && ytPlayerRef.current.seekTo) {
         ytPlayerRef.current.seekTo(adjustedMasterTime, true);
       } else if (currentVideo?.type === 'fb' && fbPlayerRef.current) {
@@ -518,13 +538,15 @@ export default function Player() {
   }, [masterControl, playbackStatus?.index, playbackStatus?.time, currentIndex, currentVideo, videos.length, appUser]);
 
   useEffect(() => {
-    // ONLY the owner or an admin should report status to the master console
-    if (!channelId || !currentVideo || !appUser || !masterControl) return;
+    // Reporting Logic: Who updates the DB?
+    // 1. If masterControl is ON: The Admin Dashboard Monitor reports (handled in ChannelDetail.tsx)
+    // 2. If masterControl is OFF: The Player tab (Outlink) reports status so others can sync.
+    // 3. Safety: Only authenticated admins/owners should be able to drive the station.
+    if (!channelId || !currentVideo || !videos.length || appUser?.role !== 'admin') return;
     
-    // Safety check: only report if we have write permissions (owner or admin)
-    // We could check channel.ownerId if we had it in state, but appUser check is a good start
-    // to prevent general public viewer console spam.
-    
+    // If masterControl is ON, the Player tab should NOT report, it should only LISTEN/FOLLOW
+    if (masterControl) return;
+
     const reportStatus = async () => {
       try {
         let currentTime = 0;
@@ -536,22 +558,23 @@ export default function Player() {
           currentTime = videoElementRef.current.currentTime;
         }
 
-        await updateDoc(doc(db, "channels", channelId), {
-          playbackStatus: {
-            index: currentIndex,
-            time: currentTime,
-            updatedAt: serverTimestamp()
-          }
-        });
+        if (currentTime > 0) {
+          await updateDoc(doc(db, "channels", channelId), {
+            playbackStatus: {
+              index: currentIndex,
+              time: currentTime,
+              updatedAt: serverTimestamp()
+            }
+          });
+        }
       } catch (err) {
-        // Silently fail if permissions are missing (prevents loop if user is not the owner)
-        console.debug("Status report skipped: Insufficient permissions");
+        console.debug("Status report skipped");
       }
     };
 
-    const interval = setInterval(reportStatus, 5000); // 5s is plenty for sync
+    const interval = setInterval(reportStatus, 5000); 
     return () => clearInterval(interval);
-  }, [channelId, currentIndex, currentVideo, appUser]);
+  }, [channelId, currentIndex, currentVideo, masterControl, videos.length]);
 
   if (videos.length === 0) {
     return (

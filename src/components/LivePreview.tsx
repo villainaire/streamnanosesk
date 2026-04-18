@@ -111,6 +111,29 @@ export default function LivePreview({ video, status, onSeek, onTimeUpdate, showC
 
   }, [video?.id, video?.type, video?.val]);
 
+  // Follow Sync Logic (for non-master mode)
+  useEffect(() => {
+    if (onTimeUpdate || !playerReady) return; 
+    
+    // Determine current local time
+    let localTime = 0;
+    if (video?.type === 'yt' && ytPlayerRef.current && ytPlayerRef.current.getCurrentTime) {
+      localTime = ytPlayerRef.current.getCurrentTime();
+    } else if (video?.type === 'generic' && videoElementRef.current) {
+      localTime = videoElementRef.current.currentTime;
+    }
+
+    // Only sync if the difference is significant (> 4s)
+    const diff = Math.abs(localTime - status.time);
+    if (diff > 4) {
+       if (video?.type === 'yt' && ytPlayerRef.current && ytPlayerRef.current.seekTo) {
+         ytPlayerRef.current.seekTo(status.time, true);
+       } else if (video?.type === 'generic' && videoElementRef.current) {
+         videoElementRef.current.currentTime = status.time;
+       }
+    }
+  }, [status.time, video?.id, playerReady]);
+
   // Status Reporting Loop (for Master Control Room)
   useEffect(() => {
     if (!onTimeUpdate) return;

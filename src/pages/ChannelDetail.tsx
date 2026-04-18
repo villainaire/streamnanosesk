@@ -365,9 +365,24 @@ export default function ChannelDetail() {
     });
   };
 
+  const activeVideos = videos.filter(v => v.active);
+
   const handlePlayVideo = async (v: Video) => {
     if (!channelId) return;
+    
+    // Find index among active videos
+    const activeIndex = activeVideos.findIndex(av => av.id === v.id);
+    if (activeIndex === -1) {
+      alert("Please activate the video first to play universally.");
+      return;
+    }
+
     await updateDoc(doc(db, "channels", channelId), {
+      playbackStatus: {
+        index: activeIndex,
+        time: v.startTime || 0,
+        updatedAt: serverTimestamp()
+      },
       syncTrigger: {
         type: 'PLAY_VIDEO',
         videoId: v.id,
@@ -388,15 +403,11 @@ export default function ChannelDetail() {
   };
 
   const handleMasterTimeUpdate = async (time: number) => {
-    if (!channelId || !channel?.masterControl) return;
-    // Debounce or only update if masterControl is really on
-    // The LivePreview loop runs every 2s, which is perfect for sync reporting
+    if (!channelId || !channel?.masterControl || !channel.playbackStatus) return;
+    
     await updateDoc(doc(db, "channels", channelId), {
-      playbackStatus: {
-        index: channel.playbackStatus?.index || 0,
-        time,
-        updatedAt: serverTimestamp()
-      }
+      "playbackStatus.time": time,
+      "playbackStatus.updatedAt": serverTimestamp()
     });
   };
 
@@ -567,9 +578,9 @@ export default function ChannelDetail() {
            <div className="bg-zinc-900 border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
               {/* MINI MASTER PLAYER */}
               <div className="aspect-video w-full bg-black relative group shadow-2xl">
-                 {channel.playbackStatus && videos[channel.playbackStatus.index] ? (
+                 {channel.playbackStatus && activeVideos[channel.playbackStatus.index] ? (
                    <LivePreview 
-                     video={videos[channel.playbackStatus.index]} 
+                     video={activeVideos[channel.playbackStatus.index]} 
                      status={channel.playbackStatus}
                      onSeek={handleMasterSeek}
                      onTimeUpdate={handleMasterTimeUpdate}
@@ -612,7 +623,7 @@ export default function ChannelDetail() {
                        </div>
                        <span className="text-[8px] font-black uppercase text-zinc-600 tracking-widest mb-2 block">Active Source</span>
                        <span className="text-[10px] md:text-xs font-black uppercase italic tracking-tighter text-zinc-200 truncate block">
-                         {channel.playbackStatus && videos[channel.playbackStatus.index] ? videos[channel.playbackStatus.index].title : 'Standby'}
+                         {channel.playbackStatus && activeVideos[channel.playbackStatus.index] ? activeVideos[channel.playbackStatus.index].title : 'Standby'}
                        </span>
                     </div>
                     <div className="bg-zinc-950 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5 relative group overflow-hidden">
