@@ -2,9 +2,24 @@ import React, { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../hooks/useAuth";
-import { Plus, Trash2, ExternalLink, Tv, Radio, Edit2 } from "lucide-react";
+import { Plus, Trash2, ExternalLink, Tv, Radio, Edit2, LayoutGrid, Monitor, LayoutList } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
+import LivePreview from "../components/LivePreview";
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, orderBy, limit, getDocs } from "firebase/firestore";
+
+interface Video {
+  id: string;
+  title: string;
+  url: string;
+  type: 'yt' | 'fb' | 'x' | 'generic';
+  val: string;
+  order: number;
+  active: boolean;
+  startTime?: number;
+  endTime?: number;
+  loopVideo?: boolean;
+}
 
 interface Channel {
   id: string;
@@ -12,6 +27,11 @@ interface Channel {
   slug: string;
   ownerId: string;
   createdAt: any;
+  playbackStatus?: {
+    index: number;
+    time: number;
+    updatedAt: any;
+  };
 }
 
 export default function AdminDashboard() {
@@ -22,6 +42,7 @@ export default function AdminDashboard() {
   const [newChannelName, setNewChannelName] = useState("");
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
   const [editChannelName, setEditChannelName] = useState("");
+  const [viewMode, setViewMode] = useState<'grid' | 'command'>('grid');
 
   useEffect(() => {
     if (!user) return;
@@ -96,18 +117,37 @@ export default function AdminDashboard() {
              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-red-500">Dashboard Area</span>
           </div>
           <h1 className="text-6xl font-black italic uppercase tracking-tighter leading-none">
-            Active <span className="text-zinc-600 italic">Stations</span>
+            {viewMode === 'grid' ? 'Active ' : 'Command '}
+            <span className="text-zinc-600 italic">{viewMode === 'grid' ? 'Stations' : 'Center'}</span>
           </h1>
         </div>
         
-        {appUser?.role === 'admin' && (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="flex items-center gap-3 bg-white text-black font-black py-4 px-8 rounded-2xl transition-all shadow-2xl hover:scale-105 active:scale-95 group"
-          >
-            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" /> Create New Feed
-          </button>
-        )}
+        <div className="flex items-center gap-4">
+          {/* View Toggle */}
+          <div className="bg-zinc-900/50 p-1.5 rounded-2xl border border-white/5 flex items-center gap-1">
+             <button 
+               onClick={() => setViewMode('grid')}
+               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'grid' ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}
+             >
+               <LayoutList className="w-3.5 h-3.5" /> Station List
+             </button>
+             <button 
+               onClick={() => setViewMode('command')}
+               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'command' ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}
+             >
+               <Monitor className="w-3.5 h-3.5" /> Command Center
+             </button>
+          </div>
+
+          {appUser?.role === 'admin' && (
+            <button
+              onClick={() => setIsAdding(true)}
+              className="flex items-center gap-3 bg-white text-black font-black py-4 px-8 rounded-2xl transition-all shadow-2xl hover:scale-105 active:scale-95 group"
+            >
+              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" /> Create New Feed
+            </button>
+          )}
+        </div>
       </div>
 
       <AnimatePresence>
@@ -213,97 +253,189 @@ export default function AdminDashboard() {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-        {channels.map((channel) => (
-          <motion.div
-            layout
-            key={channel.id}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="group relative bg-zinc-900/40 border border-white/5 rounded-[32px] p-2 hover:bg-zinc-900/60 transition-all duration-500"
+      <AnimatePresence mode="wait">
+        {viewMode === 'grid' ? (
+          <motion.div 
+            key="grid-view"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8"
           >
-            <div 
-              onClick={() => navigate(`/admin/channel/${channel.id}`)} 
-              className="block p-6 space-y-6 cursor-pointer"
-            >
-              <div className="relative aspect-[16/10] bg-zinc-950 rounded-[24px] flex items-center justify-center overflow-hidden group-hover:shadow-[0_0_40px_rgba(220,38,38,0.1)] transition-all">
-                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(220,38,38,0.15),transparent)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                 <Tv className="w-16 h-16 text-zinc-900 group-hover:text-red-600/20 transition-all duration-700 transform group-hover:scale-110" />
-                 
-                 <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1 bg-black/50 backdrop-blur-md rounded-full border border-white/5">
-                   <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse shadow-[0_0_8px_rgba(220,38,38,1)]" />
-                   <span className="text-[8px] font-black uppercase tracking-widest text-white">Live Broadcast</span>
-                 </div>
-
-                 <div className="absolute bottom-4 right-4 group-hover:translate-x-0 translate-x-12 opacity-0 group-hover:opacity-100 transition-all duration-500">
-                    <div className="bg-red-600 p-3 rounded-full shadow-xl">
-                      <Radio className="w-4 h-4 text-white animate-spin-slow" />
-                    </div>
-                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-2xl font-black italic uppercase tracking-tighter truncate leading-none">{channel.name}</h3>
-                <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono tracking-tighter opacity-60">
-                   <span className="px-2 py-0.5 bg-zinc-800 rounded">SLUG</span>
-                   <span>/play/{channel.slug}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-6 border-t border-white/5">
-                <Link 
-                  to={`/play/${channel.slug}`} 
-                  target="_blank"
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-red-500 transition-colors"
+            {channels.map((channel) => (
+              <motion.div
+                layout
+                key={channel.id}
+                className="group relative bg-zinc-900/40 border border-white/5 rounded-[32px] p-2 hover:bg-zinc-900/60 transition-all duration-500"
+              >
+                <div 
+                  onClick={() => navigate(`/admin/channel/${channel.id}`)} 
+                  className="block p-6 space-y-6 cursor-pointer"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" /> Public Link
-                </Link>
-                {appUser?.role === 'admin' && (
-                  <div className="flex items-center gap-1">
-                    <button 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setEditingChannel(channel);
-                        setEditChannelName(channel.name);
-                      }}
-                      className="p-2 text-zinc-700 hover:text-blue-500 transition-colors"
-                      title="Edit Name"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={(e) => handleDeleteChannel(channel.id, e)}
-                      className="p-2 text-zinc-700 hover:text-red-600 transition-colors"
-                      title="Delete Station"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <div className="relative aspect-[16/10] bg-zinc-950 rounded-[24px] flex items-center justify-center overflow-hidden group-hover:shadow-[0_0_40px_rgba(220,38,38,0.15)] transition-all">
+                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(220,38,38,0.15),transparent)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                     <Tv className="w-12 h-12 text-zinc-900 group-hover:text-red-600/20 transition-all duration-700 transform group-hover:scale-110" />
+                     
+                     <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1 bg-black/50 backdrop-blur-md rounded-full border border-white/5">
+                       <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse shadow-[0_0_8px_rgba(220,38,38,1)]" />
+                       <span className="text-[8px] font-black uppercase tracking-widest text-white">Live Broadcast</span>
+                     </div>
                   </div>
-                )}
-              </div>
-            </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-black italic uppercase tracking-tighter truncate leading-none">{channel.name}</h3>
+                    <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono tracking-tighter opacity-60">
+                       <span className="px-2 py-0.5 bg-zinc-800 rounded">SLUG</span>
+                       <span>/play/{channel.slug}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-6 border-t border-white/5">
+                    <Link 
+                      to={`/play/${channel.slug}`} 
+                      target="_blank"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-red-500 transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Public Link
+                    </Link>
+                    {appUser?.role === 'admin' && (
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditingChannel(channel);
+                            setEditChannelName(channel.name);
+                          }}
+                          className="p-2 text-zinc-700 hover:text-blue-500 transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={(e) => handleDeleteChannel(channel.id, e)}
+                          className="p-2 text-zinc-700 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+            
+            {/* Create Card */}
+            {appUser?.role === 'admin' && (
+              <button
+                onClick={() => setIsAdding(true)}
+                className="group relative h-full min-h-[300px] border-2 border-dashed border-white/5 rounded-[32px] p-8 flex flex-col items-center justify-center gap-6 hover:border-red-600/40 hover:bg-red-600/5 transition-all duration-500"
+              >
+                <div className="relative w-16 h-16 bg-zinc-900 border border-white/5 rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-red-600 transition-all">
+                  <Plus className="w-6 h-6 text-zinc-700 group-hover:text-white transition-colors" />
+                </div>
+                <div className="text-center">
+                  <span className="block font-black uppercase italic tracking-tighter text-xl text-zinc-500 group-hover:text-white transition-colors">Add Station</span>
+                </div>
+              </button>
+            )}
           </motion.div>
-        ))}
-        
-        {appUser?.role === 'admin' && (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="group relative h-full min-h-[400px] border-2 border-dashed border-white/5 rounded-[32px] p-8 flex flex-col items-center justify-center gap-6 hover:border-red-600/40 hover:bg-red-600/5 transition-all duration-500"
+        ) : (
+          <motion.div 
+            key="command-view"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-10"
           >
-            <div className="relative">
-              <div className="absolute inset-0 bg-zinc-800 blur-2xl group-hover:bg-red-600/20 transition-all" />
-              <div className="relative w-20 h-20 bg-zinc-900 border border-white/5 rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-red-600 transition-all">
-                <Plus className="w-8 h-8 text-zinc-700 group-hover:text-white transition-colors" />
-              </div>
-            </div>
-            <div className="text-center space-y-1">
-              <span className="block font-black uppercase italic tracking-tighter text-xl text-zinc-500 group-hover:text-white transition-colors">Add Station</span>
-              <span className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest">New broadcast stream</span>
-            </div>
-          </button>
+            {channels.map((channel) => (
+              <ChannelMonitor key={channel.id} channel={channel} />
+            ))}
+          </motion.div>
         )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ChannelMonitor({ channel }: { channel: Channel }) {
+  const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!channel.playbackStatus) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchVideo = async () => {
+      try {
+        const vq = query(
+          collection(db, "channels", channel.id, "videos"),
+          orderBy("order", "asc")
+        );
+        const snap = await getDocs(vq);
+        const videos = snap.docs.map(d => ({ id: d.id, ...d.data() } as Video));
+        
+        if (videos.length > 0) {
+          const index = channel.playbackStatus?.index || 0;
+          setCurrentVideo(videos[index] || videos[0]);
+        }
+      } catch (err) {
+        console.error("Monitor fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVideo();
+  }, [channel.id, channel.playbackStatus?.index]);
+
+  return (
+    <div className="bg-zinc-900 border border-white/5 rounded-[40px] overflow-hidden flex flex-col shadow-2xl">
+      <div className="p-6 border-b border-white/5 flex items-center justify-between bg-zinc-900/80 backdrop-blur-md">
+        <div className="flex items-center gap-4">
+           <div className="w-10 h-10 bg-black rounded-2xl flex items-center justify-center border border-white/5">
+             <Tv className="w-5 h-5 text-red-600" />
+           </div>
+           <div>
+             <h3 className="text-lg font-black italic uppercase tracking-tighter leading-none">{channel.name}</h3>
+             <p className="text-[9px] font-black uppercase text-zinc-500 tracking-widest mt-1">Live Feed v1.4</p>
+           </div>
+        </div>
+        <Link 
+          to={`/admin/channel/${channel.id}`}
+          className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all"
+        >
+          <Edit2 className="w-4 h-4 text-zinc-400" />
+        </Link>
+      </div>
+
+      <div className="aspect-video bg-black relative">
+        {loading ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Radio className="w-8 h-8 text-zinc-800 animate-pulse" />
+          </div>
+        ) : currentVideo && channel.playbackStatus ? (
+          <LivePreview 
+            video={currentVideo} 
+            status={channel.playbackStatus} 
+            showControls={false}
+          />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 opacity-20">
+            <Radio className="w-12 h-12" />
+            <span className="text-[10px] font-black uppercase tracking-widest">No Signal</span>
+          </div>
+        )}
+      </div>
+
+      <div className="p-4 bg-zinc-950/50 flex items-center justify-between text-[10px] font-mono text-zinc-500">
+         <span className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+            SYNC ACTIVE
+         </span>
+         <span>{currentVideo?.title || 'STANDBY'}</span>
       </div>
     </div>
   );
