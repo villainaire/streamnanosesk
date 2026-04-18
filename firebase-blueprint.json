@@ -1,0 +1,57 @@
+{
+  "entities": {
+    "Channel": {
+      "title": "Channel",
+      "description": "A video channel containing a playlist.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Display name of the channel" },
+        "ownerId": { "type": "string", "description": "UID of the channel creator" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "slug": { "type": "string", "description": "URL-friendly name for the channel" }
+      },
+      "required": ["name", "ownerId", "createdAt", "slug"]
+    },
+    "Video": {
+      "title": "Video",
+      "description": "A video within a channel's playlist.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "type": { "type": "string", "enum": ["yt", "fb"] },
+        "val": { "type": "string", "description": "ID for YouTube or full URL for Facebook" },
+        "order": { "type": "number" },
+        "active": { "type": "boolean" },
+        "addedBy": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "url", "type", "val", "order", "active"]
+    },
+    "User": {
+      "title": "User",
+      "description": "App user permissions.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "editor"] },
+        "displayName": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/channels/{channelId}": {
+      "schema": "Channel",
+      "description": "Collection of video channels."
+    },
+    "/channels/{channelId}/videos/{videoId}": {
+      "schema": "Video",
+      "description": "Videos belonging to a specific channel."
+    },
+    "/app_users/{userId}": {
+      "schema": "User",
+      "description": "Collection of users and their roles."
+    }
+  }
+}

@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- PRIMITIVES ---
+    function isSignedIn() { return request.auth != null; }
+    function isEmailVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // Bootstrapped Admin check
+    function isSuperAdmin() { 
+      return isSignedIn() && request.auth.token.email == "akashkamble.jb007@gmail.com";
+    }
+
+    // Role check from DB
+    function getUserData() {
+      return get(/databases/$(database)/documents/app_users/$(request.auth.uid)).data;
+    }
+    function isAdmin() {
+      return isSuperAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/app_users/$(request.auth.uid)) && getUserData().role == "admin");
+    }
+
+    // --- ENTITY VALIDATORS ---
+    function isValidChannel(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100
+          && data.ownerId == request.auth.uid
+          && data.slug is string && data.slug.size() > 0 && data.slug.size() <= 50
+          && data.slug.matches('^[a-z0-9-]+$')
+          && data.createdAt == request.time;
+    }
+
+    function isValidVideo(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 200
+          && data.url is string && data.url.size() > 0 && data.url.size() <= 1000
+          && data.type in ['yt', 'fb']
+          && data.val is string && data.val.size() > 0 && data.val.size() <= 200
+          && data.order is number
+          && data.active is bool
+          && (request.method == 'create' ? data.updatedAt == request.time : true);
+    }
+
+    function isValidAppUser(data) {
+      return data.email is string && data.email.size() > 0
+          && data.role in ['admin', 'editor']
+          && (data.displayName == null || (data.displayName is string && data.displayName.size() <= 100));
+    }
+
+    // --- MATCH BLOCKS ---
+
+    // 1. CHANNELS
+    match /channels/{channelId} {
+      allow read: if true; // Publicly viewable if you know the ID
+      allow create: if isEmailVerified() && isAdmin() && isValidChannel(incoming()) && isValidId(channelId);
+      allow update: if isEmailVerified() && (
+        (isAdmin() && existing().ownerId == request.auth.uid && isValidChannel(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'slug']))
+        || isSuperAdmin()
+      );
+      allow delete: if isEmailVerified() && (isAdmin() && existing().ownerId == request.auth.uid || isSuperAdmin());
+
+      // 2. VIDEOS (Subcollection)
+      match /videos/{videoId} {
+        allow read: if true;
+        allow create: if isEmailVerified() && isValidVideo(incoming()) && isValidId(videoId) &&
+                      (get(/databases/$(database)/documents/channels/$(channelId)).data.ownerId == request.auth.uid || isAdmin());
+        allow update: if isEmailVerified() && isValidVideo(incoming()) && (
+          (get(/databases/$(database)/documents/channels/$(channelId)).data.ownerId == request.auth.uid || isAdmin()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'url', 'type', 'val', 'order', 'active', 'updatedAt'])
+        );
+        allow delete: if isEmailVerified() && (get(/databases/$(database)/documents/channels/$(channelId)).data.ownerId == request.auth.uid || isAdmin());
+      }
+    }
+
+    // 3. APP USERS
+    match /app_users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSuperAdmin() && isValidAppUser(incoming()) && isValidId(userId);
+      allow update: if isSuperAdmin() && isValidAppUser(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'displayName']);
+      allow delete: if isSuperAdmin();
+    }
+  }
+}
