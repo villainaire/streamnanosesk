@@ -467,9 +467,9 @@ export default function ChannelDetail() {
         </div>
       </div>
 
-      <div className="pb-12 h-full">
-        {/* Full-width Playlist Center */}
-        <div className="w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 pb-12 items-start">
+        {/* Left Column: List (Order 2 on mobile, Order 2 on Desktop) */}
+        <div className="lg:col-span-12 xl:col-span-8 order-2">
           <div className="bg-zinc-900/40 border border-white/5 rounded-[32px] md:rounded-[40px] p-6 sm:p-8 lg:p-12 shadow-2xl backdrop-blur-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
                <div className="flex flex-col">
@@ -560,6 +560,147 @@ export default function ChannelDetail() {
               )}
             </Reorder.Group>
           </div>
+        </div>
+
+        {/* Right Column: Master Station Control (Order 1 on mobile, Order 1 on Desktop but sticky) */}
+        <div className="lg:col-span-12 xl:col-span-4 space-y-6 md:space-y-8 order-1 xl:sticky xl:top-28">
+           <div className="bg-zinc-900 border border-white/5 rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
+              {/* MINI MASTER PLAYER */}
+              <div className="aspect-video w-full bg-black relative group shadow-2xl">
+                 {channel.playbackStatus && videos[channel.playbackStatus.index] ? (
+                   <LivePreview 
+                     video={videos[channel.playbackStatus.index]} 
+                     status={channel.playbackStatus}
+                     onSeek={handleMasterSeek}
+                     onTimeUpdate={handleMasterTimeUpdate}
+                     showControls={false}
+                   />
+                 ) : (
+                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950">
+                      <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center border border-white/5">
+                        <Play className="w-8 h-8 text-zinc-800" />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-800">No Signal Detected</span>
+                   </div>
+                 )}
+                 <div className="absolute top-4 left-4 z-10">
+                    <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
+                       <div className={`w-2 h-2 rounded-full ${channel.masterControl ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`} />
+                       <span className="text-[9px] font-black uppercase tracking-widest text-white">Live Monitor</span>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="p-6 md:p-8 space-y-6 md:space-y-8">
+                 <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                       <h3 className="text-lg md:text-xl font-black italic uppercase tracking-tighter leading-none">Broadcast <span className="text-zinc-600">Console</span></h3>
+                       <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Station Mission Control</p>
+                    </div>
+                    {channel.masterControl && (
+                       <div className="flex items-center gap-2 bg-blue-600/10 px-3 py-1.5 rounded-xl border border-blue-500/20">
+                          <Radio className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                          <span className="text-[10px] font-black uppercase text-blue-500 shrink-0">Syncing...</span>
+                       </div>
+                    )}
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <div className="bg-zinc-950 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5 relative group overflow-hidden">
+                       <div className="absolute bottom-0 right-0 p-2 opacity-5 pointer-events-none group-hover:opacity-20 transition-opacity">
+                          <Radio className="w-8 md:w-12 h-8 md:h-12" />
+                       </div>
+                       <span className="text-[8px] font-black uppercase text-zinc-600 tracking-widest mb-2 block">Active Source</span>
+                       <span className="text-[10px] md:text-xs font-black uppercase italic tracking-tighter text-zinc-200 truncate block">
+                         {channel.playbackStatus && videos[channel.playbackStatus.index] ? videos[channel.playbackStatus.index].title : 'Standby'}
+                       </span>
+                    </div>
+                    <div className="bg-zinc-950 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/5 relative group overflow-hidden">
+                       <div className="absolute bottom-0 right-0 p-2 opacity-5 pointer-events-none group-hover:opacity-20 transition-opacity">
+                          <RefreshCw className="w-8 md:w-12 h-8 md:h-12" />
+                       </div>
+                       <span className="text-[8px] font-black uppercase text-zinc-600 tracking-widest mb-2 block">Sync Clock</span>
+                       <span className="text-[10px] md:text-xs font-black text-blue-500 block">
+                         {channel.playbackStatus ? fromSeconds(Math.floor(channel.playbackStatus.time)) : '00:00:00'}
+                       </span>
+                    </div>
+                 </div>
+
+                 <div className="space-y-3 md:space-y-4 pt-4 border-t border-white/5">
+                   <button 
+                     onClick={toggleMasterControl}
+                     className={`flex items-center justify-between w-full p-4 md:p-6 border rounded-2xl md:rounded-[28px] transition-all group ${channel?.masterControl ? 'bg-blue-600 text-white border-blue-500' : 'bg-zinc-950 border-white/5 hover:border-white/10'}`}
+                   >
+                      <div className="flex items-center gap-3 md:gap-4">
+                         <div className={`w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center border ${channel?.masterControl ? 'bg-white/20 border-white/30' : 'bg-zinc-900 border-white/5'}`}>
+                            <Radio className={`w-4 h-4 md:w-5 md:h-5 ${channel?.masterControl ? 'text-white' : 'text-zinc-600'}`} />
+                         </div>
+                         <div className="flex flex-col items-start min-w-0">
+                            <span className={`font-black text-xs md:text-sm uppercase italic tracking-tighter truncate ${channel?.masterControl ? 'text-white' : 'text-zinc-400'}`}>Master Control</span>
+                            <span className={`text-[8px] font-bold uppercase tracking-widest ${channel?.masterControl ? 'text-white/60' : 'text-zinc-600'}`}>Toggle Universal Sync</span>
+                         </div>
+                      </div>
+                      <div className={`w-10 h-5 md:w-12 md:h-6 rounded-full relative transition-colors shrink-0 ${channel?.masterControl ? 'bg-white/20' : 'bg-zinc-800'}`}>
+                         <div className={`absolute top-0.5 md:top-1 w-4 h-4 rounded-full transition-all shadow-lg ${channel?.masterControl ? 'right-0.5 md:right-1 bg-white' : 'left-0.5 md:left-1 bg-zinc-600'}`} />
+                      </div>
+                   </button>
+
+                   <div className="grid grid-cols-2 gap-3 md:gap-4">
+                     <button 
+                       onClick={handleRestartPlaylist}
+                       className="flex items-center gap-2 md:gap-3 p-4 md:p-5 bg-zinc-950 border border-white/5 rounded-2xl md:rounded-[28px] hover:bg-zinc-900 transition-all group overflow-hidden"
+                     >
+                       <RefreshCw className="w-3.5 md:w-4 h-3.5 md:h-4 text-zinc-600 group-hover:rotate-180 transition-transform duration-500 shrink-0" />
+                       <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-500 group-hover:text-white truncate">Restart List</span>
+                     </button>
+                     <button 
+                       onClick={handleRestartVideo}
+                       className="flex items-center gap-2 md:gap-3 p-4 md:p-5 bg-zinc-950 border border-white/5 rounded-2xl md:rounded-[28px] hover:bg-zinc-900 transition-all group overflow-hidden"
+                     >
+                       <Play className="w-3.5 md:w-4 h-3.5 md:h-4 text-zinc-600 group-hover:scale-110 transition-transform shrink-0" />
+                       <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-500 group-hover:text-white truncate">Restart Source</span>
+                     </button>
+                   </div>
+
+                   <button 
+                     onClick={toggleLoop}
+                     className={`flex items-center justify-between w-full p-4 md:p-6 border rounded-2xl md:rounded-[28px] transition-all group ${channel.loopPlaylist ? 'bg-red-600/10 border-red-500/40' : 'bg-zinc-950 border-white/5 hover:border-white/10'}`}
+                   >
+                      <div className="flex items-center gap-3 md:gap-4">
+                         <div className={`w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center border ${channel.loopPlaylist ? 'bg-red-500/10 border-red-500/20' : 'bg-zinc-900 border-white/5'}`}>
+                            <Disc className={`w-4 h-4 md:w-5 md:h-5 ${channel.loopPlaylist ? 'text-red-500 animate-spin' : 'text-zinc-600'}`} />
+                         </div>
+                         <div className="flex flex-col items-start min-w-0">
+                            <span className={`font-black text-xs md:text-sm uppercase italic tracking-tighter truncate ${channel.loopPlaylist ? 'text-red-500' : 'text-zinc-400'}`}>Loop Playlist</span>
+                            <span className={`text-[8px] font-bold uppercase tracking-widest ${channel.loopPlaylist ? 'text-red-500/60' : 'text-zinc-600'}`}>Auto-loop Station</span>
+                         </div>
+                      </div>
+                      <div className={`w-10 h-5 md:w-12 md:h-6 rounded-full relative transition-colors shrink-0 ${channel.loopPlaylist ? 'bg-red-600' : 'bg-zinc-800'}`}>
+                         <div className={`absolute top-0.5 md:top-1 w-4 h-4 rounded-full transition-all shadow-lg ${channel.loopPlaylist ? 'right-0.5 md:right-1 bg-white' : 'left-0.5 md:left-1 bg-zinc-600'}`} />
+                      </div>
+                   </button>
+                 </div>
+              </div>
+           </div>
+
+           <div className="bg-zinc-900/40 border border-white/5 rounded-3xl md:rounded-[32px] p-6 md:p-8 shadow-2xl backdrop-blur-md">
+              <h3 className="text-lg md:text-xl font-black italic uppercase tracking-tighter mb-4 md:mb-6 flex items-center gap-3">
+                 <ExternalLink className="w-5 h-5 text-zinc-600" /> Connection Details
+              </h3>
+              <div className="space-y-3 md:space-y-4">
+                 <div className="p-4 md:p-6 bg-black/40 border border-white/5 rounded-2xl md:rounded-3xl space-y-2 md:space-y-3">
+                    <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] block">Public Output Address</span>
+                    <div className="flex items-center justify-between gap-4">
+                       <span className="text-[10px] md:text-xs font-mono text-zinc-400 truncate break-all">ais.stream/play/{channel.slug}</span>
+                       <button className="text-[8px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors shrink-0">Copy</button>
+                    </div>
+                 </div>
+                 <div className="p-4 md:p-6 bg-black/40 border border-white/5 rounded-2xl md:rounded-3xl">
+                    <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Station ID</span>
+                    <span className="text-[10px] md:text-xs font-mono text-zinc-500 break-all">{channel.id}</span>
+                 </div>
+              </div>
+           </div>
         </div>
       </div>
 

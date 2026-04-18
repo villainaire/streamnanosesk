@@ -31,6 +31,7 @@ export default function LivePreview({ video, status, onSeek, onTimeUpdate, showC
   const videoElementRef = useRef<HTMLVideoElement>(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   // Initialize YT API if needed
   useEffect(() => {
@@ -116,6 +117,18 @@ export default function LivePreview({ video, status, onSeek, onTimeUpdate, showC
 
   }, [video?.id, video?.type, video?.val]);
 
+  // Handle User Interaction to Force Play
+  const handleActivate = () => {
+    setHasInteracted(true);
+    if (video?.type === 'yt' && ytPlayerRef.current) {
+      ytPlayerRef.current.playVideo();
+      ytPlayerRef.current.mute();
+    } else if (video?.type === 'generic' && videoElementRef.current) {
+      videoElementRef.current.play();
+      videoElementRef.current.muted = true;
+    }
+  };
+
   // Status Reporting Loop (for Master Control Room)
   useEffect(() => {
     if (!onTimeUpdate) return;
@@ -138,11 +151,14 @@ export default function LivePreview({ video, status, onSeek, onTimeUpdate, showC
   }, [video?.id, onTimeUpdate]);
 
   return (
-    <div className="w-full h-full relative group bg-black">
+    <div 
+      className="w-full h-full relative group bg-black cursor-pointer"
+      onClick={handleActivate}
+    >
        {/* YouTube Container */}
        {video?.type === 'yt' && (
           <div className="w-full h-full">
-            <div id={`preview-player-${video.id}`} className="w-full h-full" />
+            <div id={`preview-player-${video.id}`} className="w-full h-full pointer-events-none" />
             {!playerReady && !error && (
               <div className="absolute inset-0 flex items-center justify-center bg-zinc-950">
                 <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
@@ -185,11 +201,23 @@ export default function LivePreview({ video, status, onSeek, onTimeUpdate, showC
            autoPlay 
            muted 
            playsInline
-           className="w-full h-full object-contain"
+           className="w-full h-full object-contain pointer-events-none"
            onLoadedMetadata={(e: any) => {
              e.target.currentTime = status.time;
            }}
          />
+       )}
+
+       {playerReady && !hasInteracted && (
+          <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-4 transition-all group-hover:bg-black/40 pointer-events-none">
+             <div className="w-16 h-16 rounded-full bg-red-600/20 border border-red-500/40 flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.2)]">
+                <Play className="w-8 h-8 text-white fill-current animate-pulse" />
+             </div>
+             <div className="flex flex-col items-center">
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white">Tap to Sync Monitor</span>
+                <span className="text-[8px] font-medium uppercase tracking-widest text-zinc-500 mt-1">Browser blocked autoplay</span>
+             </div>
+          </div>
        )}
 
        {error && (
