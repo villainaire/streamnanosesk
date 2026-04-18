@@ -129,6 +129,8 @@ export default function Player() {
   const fbIntervalRef = useRef<any>(null);
   const videoElementRef = useRef<HTMLVideoElement>(null);
 
+  const lastHandledSyncRef = useRef<number>(0);
+
   // 1. Fetch Channel and Playlist
   useEffect(() => {
     if (!channelSlug) return;
@@ -149,11 +151,8 @@ export default function Player() {
           const { type, timestamp } = data.syncTrigger;
           const triggerTime = timestamp?.toMillis() || 0;
           
-          // Only process if it's a NEW trigger (not from a previous session)
-          const lastTriggerTime = parseInt(localStorage.getItem(`lastSync_${channelDoc.id}`) || "0");
-          
-          if (triggerTime > lastTriggerTime) {
-            localStorage.setItem(`lastSync_${channelDoc.id}`, triggerTime.toString());
+          if (triggerTime > lastHandledSyncRef.current) {
+            lastHandledSyncRef.current = triggerTime;
             
             if (type === 'RESTART_PLAYLIST') {
               setCurrentIndex(0);
@@ -162,9 +161,6 @@ export default function Player() {
               setPlayCount(c => c + 1);
             } else if (type === 'PLAY_VIDEO') {
               const vId = data.syncTrigger.videoId;
-              // We need the latest videos array here, but videos are loaded in another effect.
-              // We'll use a signal to trigger a search in the next render or use a ref.
-              // Actually, we can just find it in the current state if it's already there.
               setTargetVideoId(vId);
             } else if (type === 'SEEK_TO') {
               const time = data.syncTrigger.time;
@@ -182,7 +178,7 @@ export default function Player() {
     });
 
     return () => unsubChannel();
-  }, [channelSlug]);
+  }, [channelSlug, currentVideo?.id, currentVideo?.type]);
 
   useEffect(() => {
     if (!channelId) return;
@@ -497,8 +493,8 @@ export default function Player() {
     // b. We are NOT admin (Follower)
     // Actually, simply: If I'm NOT driving the reporting, I should be following.
     
-    // Condition to skip following (we be the leader):
-    const isStationLeader = appUser?.role === 'admin' && !masterControl;
+    // Condition to skip following (we are the leader):
+    const isStationLeader = appUser?.role === 'admin';
     if (isStationLeader || !playbackStatus || !videos.length) return;
 
     // Determine current local time
@@ -539,14 +535,10 @@ export default function Player() {
 
   useEffect(() => {
     // Reporting Logic: Who updates the DB?
-    // 1. If masterControl is ON: The Admin Dashboard Monitor reports (handled in ChannelDetail.tsx)
-    // 2. If masterControl is OFF: The Player tab (Outlink) reports status so others can sync.
-    // 3. Safety: Only authenticated admins/owners should be able to drive the station.
+    // Safety: Only authenticated admins/owners should be able to drive the station.
     if (!channelId || !currentVideo || !videos.length || appUser?.role !== 'admin') return;
     
-    // If masterControl is ON, the Player tab should NOT report, it should only LISTEN/FOLLOW
-    if (masterControl) return;
-
+    // With the Live Monitor removed, the Outlink player is always the source of truth for admins.
     const reportStatus = async () => {
       try {
         let currentTime = 0;
