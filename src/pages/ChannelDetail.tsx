@@ -548,37 +548,51 @@ export default function ChannelDetail() {
         </div>
 
         <div className="space-y-8">
-           {channel?.masterControl && channel.playbackStatus && (
-             <div className="bg-zinc-900 border border-blue-500/20 rounded-[32px] p-6 shadow-2xl relative overflow-hidden group">
-                <div className="absolute top-0 left-0 w-1 h-full bg-blue-600" />
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse shadow-[0_0_8px_rgba(220,38,38,1)]" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-white">Station Live Feed</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-zinc-500">Master Sync Enabled</span>
-                </div>
-                
-                <div className="aspect-video bg-black rounded-2xl overflow-hidden relative mb-4">
-                  <LivePreview 
-                    video={videos[channel.playbackStatus.index]} 
-                    status={channel.playbackStatus} 
-                    onSeek={handleMasterSeek}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between px-2">
-                   <div className="flex flex-col">
-                      <span className="text-[10px] font-black uppercase text-zinc-500 tracking-tighter">Current Source</span>
-                      <span className="text-xs font-bold truncate max-w-[200px]">{videos[channel.playbackStatus.index]?.title || 'No Source'}</span>
+           <div className="bg-zinc-900 border border-blue-500/20 rounded-[32px] p-8 shadow-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] -mr-32 -mt-32" />
+              <div className="relative space-y-6">
+                 <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(59,130,246,1)]" />
+                       <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">Master Station Terminal</span>
+                    </div>
+                    {channel?.masterControl && (
+                      <span className="text-[8px] font-black uppercase bg-blue-600 text-white px-2 py-0.5 rounded animate-pulse">Live Sync Active</span>
+                    )}
+                 </div>
+                 
+                 <div className="space-y-2">
+                    <h3 className="text-3xl font-black italic uppercase tracking-tighter leading-none">Broadcast <span className="text-zinc-600">Console</span></h3>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Universal sync enabled player</p>
+                 </div>
+
+                 <Link 
+                   to={`/play/${channel?.slug}`}
+                   target="_blank"
+                   className="flex items-center justify-center gap-3 w-full py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-[24px] font-black uppercase italic tracking-tighter text-xl transition-all shadow-[0_20px_40px_rgba(59,130,246,0.2)] active:scale-95 group"
+                 >
+                   <ExternalLink className="w-6 h-6 group-hover:rotate-12 transition-transform" /> Launch Master Feed
+                 </Link>
+                 
+                 {channel?.playbackStatus && (
+                   <div className="flex items-center justify-between p-4 bg-black/40 rounded-2xl border border-white/5">
+                      <div className="flex items-center gap-3">
+                         <div className="w-8 h-8 bg-zinc-800 rounded-lg flex items-center justify-center">
+                            <Radio className="w-4 h-4 text-blue-500" />
+                         </div>
+                         <div className="flex flex-col">
+                            <span className="text-[8px] font-black uppercase text-zinc-500 leading-none mb-1">Current Output</span>
+                            <span className="text-[10px] font-bold truncate max-w-[150px]">{videos[channel.playbackStatus.index]?.title || 'Standby'}</span>
+                         </div>
+                      </div>
+                      <div className="text-right">
+                         <span className="text-[8px] font-black uppercase text-zinc-500 leading-none">Sync Time</span>
+                         <div className="text-xs font-black text-blue-500">{fromSeconds(Math.floor(channel.playbackStatus.time))}</div>
+                      </div>
                    </div>
-                   <div className="text-right">
-                      <span className="text-[10px] font-black uppercase text-zinc-500 tracking-tighter">Live Time</span>
-                      <div className="text-sm font-black italic text-blue-500">{fromSeconds(Math.floor(channel.playbackStatus.time))}</div>
-                   </div>
-                </div>
-             </div>
-           )}
+                 )}
+              </div>
+           </div>
 
            <div className="bg-zinc-900 border border-white/5 rounded-[32px] p-8 shadow-2xl">
               <h3 className="text-xl font-black italic uppercase tracking-tighter mb-6">Quick Settings</h3>

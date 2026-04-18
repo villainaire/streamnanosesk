@@ -69,9 +69,11 @@ export default function Player() {
   const [playCount, setPlayCount] = useState(0);
   const [channelName, setChannelName] = useState("Loading...");
   const [channelId, setChannelId] = useState("");
+  const [masterControl, setMasterControl] = useState(false);
   const [loopPlaylist, setLoopPlaylist] = useState(false);
   const [targetVideoId, setTargetVideoId] = useState<string | null>(null);
-  
+  const [playbackStatus, setPlaybackStatus] = useState<any>(null);
+
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editStartTime, setEditStartTime] = useState("");
@@ -139,6 +141,8 @@ export default function Player() {
         setChannelId(channelDoc.id);
         setChannelName(data.name);
         setLoopPlaylist(data.loopPlaylist || false);
+        setMasterControl(data.masterControl || false);
+        setPlaybackStatus(data.playbackStatus || null);
 
         // Remote Sync Command Listener
         if (data.syncTrigger) {
@@ -471,9 +475,49 @@ export default function Player() {
     }
   }, [targetVideoId, videos]);
 
+  // 4. Universal Synchronization (Follow Master)
+  useEffect(() => {
+    if (!masterControl || !playbackStatus || !videos.length) return;
+
+    // Determine current local time
+    let localTime = 0;
+    if (currentVideo?.type === 'yt' && ytPlayerRef.current && ytPlayerRef.current.getCurrentTime) {
+      localTime = ytPlayerRef.current.getCurrentTime();
+    } else if (currentVideo?.type === 'fb' && fbPlayerRef.current) {
+      localTime = fbPlayerRef.current.getCurrentPosition();
+    } else if (currentVideo?.type === 'generic' && videoElementRef.current) {
+      localTime = videoElementRef.current.currentTime;
+    }
+
+    const { index, time, updatedAt } = playbackStatus;
+    
+    // 1. Check Index
+    if (index !== currentIndex) {
+      setCurrentIndex(index);
+      return;
+    }
+
+    // 2. Check Drift (Allow 6 seconds gap for network latency)
+    const now = Date.now();
+    const recordedAt = updatedAt?.toMillis() || now;
+    const driftSeconds = (now - recordedAt) / 1000;
+    const adjustedMasterTime = time + driftSeconds;
+
+    if (Math.abs(localTime - adjustedMasterTime) > 7) {
+      console.log("Universal Sync: Seeking to master time", adjustedMasterTime);
+      if (currentVideo?.type === 'yt' && ytPlayerRef.current && ytPlayerRef.current.seekTo) {
+        ytPlayerRef.current.seekTo(adjustedMasterTime, true);
+      } else if (currentVideo?.type === 'fb' && fbPlayerRef.current) {
+        fbPlayerRef.current.seek(adjustedMasterTime);
+      } else if (currentVideo?.type === 'generic' && videoElementRef.current) {
+        videoElementRef.current.currentTime = adjustedMasterTime;
+      }
+    }
+  }, [masterControl, playbackStatus?.index, playbackStatus?.time]);
+
   useEffect(() => {
     // ONLY the owner or an admin should report status to the master console
-    if (!channelId || !currentVideo || !appUser) return;
+    if (!channelId || !currentVideo || !appUser || !masterControl) return;
     
     // Safety check: only report if we have write permissions (owner or admin)
     // We could check channel.ownerId if we had it in state, but appUser check is a good start
