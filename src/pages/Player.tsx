@@ -82,6 +82,8 @@ export default function Player() {
   const [isFetching, setIsFetching] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const [isStarted, setIsStarted] = useState(false);
+
   const loopPlaylistRef = useRef(loopPlaylist);
   const videosRef = useRef(videos);
   const currentIndexRef = useRef(currentIndex);
@@ -308,7 +310,8 @@ export default function Player() {
   };
 
   const handleRefreshVideo = () => {
-    setPlayCount(c => c + 1); // This will trigger the useEffect to reload the player
+    setPlayCount(c => c + 1); 
+    setIsStarted(true);
   };
   
   const handlePrev = () => setCurrentIndex((p) => (p - 1 + videos.length) % videos.length);
@@ -570,12 +573,12 @@ export default function Player() {
 
   if (videos.length === 0) {
     return (
-      <div className="w-[2400px] h-[1300px] bg-black flex flex-col items-center justify-center relative overflow-hidden">
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center overflow-hidden">
         <div className="relative flex flex-col items-center gap-6">
-           <Tv className="w-20 h-20 text-zinc-900 animate-pulse" />
-           <div className="text-center">
-             <h2 className="text-xl font-black italic uppercase tracking-tighter text-zinc-800">{channelName}</h2>
-             <p className="text-zinc-900 text-[10px] font-black uppercase tracking-[0.3em] mt-2">No Feed Detected</p>
+           <Tv className="w-16 h-16 text-zinc-900 animate-pulse" />
+           <div className="text-center px-6">
+             <h2 className="text-lg md:text-xl font-black italic uppercase tracking-tighter text-zinc-800">{channelName}</h2>
+             <p className="text-zinc-900 text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] mt-2">Connecting to Feed...</p>
            </div>
         </div>
       </div>
@@ -583,67 +586,96 @@ export default function Player() {
   }
 
   return (
-    <div className="w-[2400px] h-[1300px] bg-black overflow-hidden flex font-sans text-white border-b-[220px] border-black">
+    <div className="fixed inset-0 bg-black overflow-hidden flex flex-col md:flex-row font-sans text-white">
       {/* 
-        CLEAN BROADCAST AREA (Fixed 1920x1080)
-        Top-Left aligned for easy OBS cropping.
+        BROADCAST AREA
+        Main player container with aspect ratio preservation
       */}
-      <div className="w-[1920px] h-[1080px] relative bg-black shrink-0">
-        {/* YouTube Container */}
-        <div className={`w-full h-full ${currentVideo?.type !== 'yt' ? 'hidden' : ''}`}>
-          <div id="yt-player-target" className="w-full h-full" />
+      <div className="flex-1 relative bg-black flex items-center justify-center p-0 md:p-4 overflow-hidden">
+        <div className="w-full aspect-video max-h-full max-w-full relative shadow-[0_0_100px_rgba(0,0,0,1)] z-10">
+          {/* YouTube Container */}
+          <div className={`absolute inset-0 w-full h-full ${currentVideo?.type !== 'yt' ? 'hidden' : ''}`}>
+            <div id="yt-player-target" className="w-full h-full" />
+          </div>
+
+          {/* Facebook Container */}
+          <div className={`absolute inset-0 w-full h-full flex items-center justify-center ${currentVideo?.type !== 'fb' ? 'hidden' : ''}`} key={`${currentVideo.id}-${playCount}`}>
+            <div 
+              className="fb-video" 
+              data-href={currentVideo?.val} 
+              data-autoplay="true" 
+              data-allowfullscreen="true"
+              data-width="auto"
+              data-show-captions="false"
+              style={{ width: '100%', height: '100%' }}
+            />
+          </div>
+
+          {/* X (Twitter) Container */}
+          <div className={`absolute inset-0 w-full h-full bg-black flex items-center justify-center ${currentVideo?.type !== 'x' ? 'hidden' : ''}`} key={`${currentVideo.id}-x-${playCount}`}>
+            <iframe
+              src={currentVideo?.type === 'x' ? `https://twitframe.com/show?url=${encodeURIComponent(currentVideo.val)}` : ''}
+              className="w-full h-full border-none"
+              allow="autoplay; encrypted-media; fullscreen"
+            />
+          </div>
+
+          {/* Generic/Standard Video Container */}
+          <div className={`absolute inset-0 w-full h-full bg-black flex items-center justify-center ${currentVideo?.type !== 'generic' ? 'hidden' : ''}`}>
+            <video
+              ref={videoElementRef}
+              src={currentVideo?.type === 'generic' ? currentVideo.val : ''}
+              autoPlay
+              muted={!isStarted}
+              controls
+              className="w-full h-full object-contain"
+              onEnded={handleNext}
+              onLoadedMetadata={(e: any) => {
+                if (currentVideo?.startTime) e.target.currentTime = currentVideo.startTime;
+              }}
+              onTimeUpdate={(e: any) => {
+                if (currentVideo?.endTime && e.target.currentTime >= currentVideo.endTime) {
+                  handleNext();
+                }
+              }}
+            />
+          </div>
+
+          {/* Autoplay/Mute Overlay */}
+          {!isStarted && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer group"
+              onClick={() => {
+                setIsStarted(true);
+                if (ytPlayerRef.current?.unMute) ytPlayerRef.current.unMute();
+                if (fbPlayerRef.current?.unmute) fbPlayerRef.current.unmute();
+              }}
+            >
+              <div className="relative">
+                <div className="absolute inset-0 bg-red-600 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity" />
+                <div className="bg-red-600 p-6 md:p-8 rounded-full shadow-2xl relative">
+                  <Play className="w-8 h-8 md:w-10 md:h-10 text-white fill-current" />
+                </div>
+              </div>
+              <p className="mt-6 text-sm font-black uppercase tracking-[0.3em] text-white/50 animate-pulse">Tap to Start Broadcast</p>
+            </motion.div>
+          )}
         </div>
 
-        {/* Facebook Container */}
-        <div className={`w-full h-full flex items-center justify-center ${currentVideo?.type !== 'fb' ? 'hidden' : ''}`} key={`${currentVideo.id}-${playCount}`}>
-          <div 
-            className="fb-video" 
-            data-href={currentVideo?.val} 
-            data-autoplay="true" 
-            data-allowfullscreen="true"
-            data-width="1920"
-            data-show-captions="false"
-            style={{ width: '1920px', height: '1080px' }}
-          />
-        </div>
-
-        {/* X (Twitter) Container */}
-        <div className={`w-full h-full bg-black flex items-center justify-center ${currentVideo?.type !== 'x' ? 'hidden' : ''}`} key={`${currentVideo.id}-x-${playCount}`}>
-          <iframe
-            src={currentVideo?.type === 'x' ? `https://twitframe.com/show?url=${encodeURIComponent(currentVideo.val)}` : ''}
-            className="w-full h-full border-none shadow-2xl"
-            allow="autoplay; encrypted-media; fullscreen"
-          />
-        </div>
-
-        {/* Generic/Standard Video Container */}
-        <div className={`w-full h-full bg-black flex items-center justify-center ${currentVideo?.type !== 'generic' ? 'hidden' : ''}`}>
-          <video
-            ref={videoElementRef}
-            src={currentVideo?.type === 'generic' ? currentVideo.val : ''}
-            autoPlay
-            muted={false}
-            controls
-            className="w-full h-full object-contain"
-            onEnded={handleNext}
-            onLoadedMetadata={(e: any) => {
-              if (currentVideo?.startTime) e.target.currentTime = currentVideo.startTime;
-            }}
-            onTimeUpdate={(e: any) => {
-              if (currentVideo?.endTime && e.target.currentTime >= currentVideo.endTime) {
-                handleNext();
-              }
-            }}
-          />
+        {/* Ambient background bloom */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-red-900/30 blur-[150px] rounded-full" />
         </div>
       </div>
 
-      {/* Control Sidebar (Permanent, 480px Wide, 1300px High) */}
-      <div className="w-[480px] h-[1300px] bg-zinc-950 border-l border-white/5 flex flex-col shadow-[-20px_0_50px_rgba(0,0,0,0.5)]">
-        <div className="p-8 border-b border-white/5 bg-zinc-900/50 flex items-center justify-between">
+      {/* Control Sidebar (Responsive) */}
+      <div className="w-full md:w-[400px] lg:w-[480px] h-[400px] md:h-full bg-zinc-950 border-l border-white/5 flex flex-col shadow-[-20px_0_50px_rgba(0,0,0,0.5)] z-20">
+        <div className="p-6 md:p-8 border-b border-white/5 bg-zinc-900/50 flex items-center justify-between">
           <div className="space-y-1">
-            <h3 className="text-xs font-black italic uppercase tracking-[0.3em] text-zinc-500">Live Feed</h3>
-            <h4 className="text-xl font-black uppercase italic tracking-tighter">Sequence Menu</h4>
+            <h3 className="text-[10px] font-black italic uppercase tracking-[0.3em] text-zinc-500">Live Feed</h3>
+            <h4 className="text-base md:text-xl font-black uppercase italic tracking-tighter">Sequence Menu</h4>
           </div>
           <div className="flex items-center gap-2">
             <button 
@@ -653,29 +685,29 @@ export default function Player() {
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
-            {appUser && (
+            {appUser?.role === 'admin' && (
               <button 
                 onClick={toggleGlobalLoop}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${loopPlaylist ? 'bg-red-600 border-red-500 text-white' : 'bg-zinc-900 border-white/5 text-zinc-500'}`}
               >
                 <Disc className={`w-3.5 h-3.5 ${loopPlaylist && 'animate-spin'}`} />
-                <span className="text-[10px] font-black uppercase tracking-widest">Loop</span>
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Loop</span>
               </button>
             )}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-black/20">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 md:space-y-4 custom-scrollbar bg-black/20">
           {videos.map((v, i) => (
             <motion.div
               key={v.id}
               whileHover={{ scale: 1.01 }}
-              className={`group w-full p-4 flex gap-5 text-left transition-all rounded-3xl border border-white/5 ${
+              className={`group w-full p-3 md:p-4 flex gap-4 md:gap-5 text-left transition-all rounded-2xl md:rounded-3xl border border-white/5 ${
                 i === currentIndex ? 'bg-red-600/10 border-red-500/20 shadow-2xl' : 'bg-black/40'
               }`}
             >
               <div 
-                className="w-24 aspect-video bg-zinc-900 rounded-[15px] shrink-0 flex items-center justify-center overflow-hidden relative cursor-pointer"
+                className="w-20 md:w-24 aspect-video bg-zinc-900 rounded-[12px] md:rounded-[15px] shrink-0 flex items-center justify-center overflow-hidden relative cursor-pointer"
                 onClick={() => setCurrentIndex(i)}
               >
                 {v.type === 'yt' ? (
@@ -694,53 +726,40 @@ export default function Player() {
                   </div>
                 )}
               </div>
-              <div className="flex-1 min-w-0 py-1 flex flex-col">
+              <div className="flex-1 min-w-0 py-1 flex flex-col justify-center">
                 <div 
                   className="flex-1 cursor-pointer"
                   onClick={() => setCurrentIndex(i)}
                 >
-                  <h4 className={`font-black uppercase tracking-tight leading-tight line-clamp-1 text-xs mb-1 ${i === currentIndex ? 'text-white' : 'text-zinc-500'}`}>
+                  <h4 className={`font-black uppercase tracking-tight leading-tight line-clamp-1 text-[10px] md:text-xs mb-1 ${i === currentIndex ? 'text-white' : 'text-zinc-500'}`}>
                     {v.title}
                   </h4>
-                  <div className="flex items-center gap-2 mb-2">
-                    {v.loopVideo && <span className="text-[8px] bg-orange-500 text-black px-1.5 py-0.5 rounded font-black uppercase">L-ON</span>}
+                  <div className="flex items-center gap-2">
+                    {v.loopVideo && <span className="text-[8px] bg-orange-500 text-black px-1 py-0.5 rounded font-black uppercase">L-ON</span>}
                     {(v.startTime || v.endTime) && (
-                      <span className="text-[8px] bg-red-600/20 text-red-500 px-1.5 py-0.5 rounded font-black uppercase">
+                      <span className="text-[7px] md:text-[8px] bg-red-600/20 text-red-500 px-1.5 py-0.5 rounded font-black uppercase">
                         {fromSeconds(v.startTime || 0)}-{fromSeconds(v.endTime || 0)} 
-                        <span className="ml-1 opacity-50">({fromSeconds((v.endTime || 0) - (v.startTime || 0))})</span>
                       </span>
                     )}
                   </div>
                 </div>
                 
-                {appUser && (
-                  <div className="flex items-center gap-3">
+                {appUser?.role === 'admin' && (
+                  <div className="flex items-center gap-3 mt-2">
                     <button 
                       onClick={() => handlePlaySpecificVideo(v.id)}
                       className={`p-1.5 rounded-lg transition-all ${i === currentIndex ? 'bg-red-600 text-white' : 'bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white'}`}
                       title="Play Now (Sync All)"
                     >
-                      <Play className="w-3.5 h-3.5 fill-current" />
-                    </button>
-                    <button 
-                      onClick={() => {
-                         setEditingVideo(v);
-                         setEditTitle(v.title);
-                         setEditUrl(v.url);
-                         setEditStartTime(fromSeconds(v.startTime || 0));
-                         setEditEndTime(fromSeconds(v.endTime || 0));
-                      }}
-                      className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-600 hover:text-white transition-all"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      <Play className="w-3 h-3 fill-current" />
                     </button>
                     <button 
                       onClick={() => toggleSingleLoop(v)}
                       className={`p-1.5 rounded-lg transition-all ${v.loopVideo ? 'text-orange-500 bg-orange-500/10' : 'text-zinc-600 hover:text-zinc-400'}`}
                     >
-                      <Disc className={`w-3.5 h-3.5 ${v.loopVideo && 'animate-spin'}`} />
+                      <Disc className={`w-3 h-3 ${v.loopVideo && 'animate-spin'}`} />
                     </button>
-                    {i === currentIndex && <ChevronRight className="w-4 h-4 text-red-600 ml-auto" />}
+                    {i === currentIndex && <ChevronRight className="w-3 h-3 text-red-600 ml-auto" />}
                   </div>
                 )}
               </div>
@@ -749,12 +768,12 @@ export default function Player() {
         </div>
 
         {/* Global Controls */}
-        <div className="p-10 bg-black/80 backdrop-blur-3xl border-t border-white/5 flex flex-col gap-8">
-            {appUser && (
-              <div className="flex items-center justify-center gap-4">
+        <div className="p-6 md:p-10 bg-black/80 backdrop-blur-3xl border-t border-white/5 flex flex-col gap-6 md:gap-8">
+            {appUser?.role === 'admin' && (
+              <div className="flex items-center justify-center gap-3 md:gap-4">
                  <button 
                    onClick={handlePrev}
-                   className="p-4 bg-zinc-900 hover:bg-zinc-800 rounded-[20px] transition-all group active:scale-90"
+                   className="p-3 md:p-4 bg-zinc-900 hover:bg-zinc-800 rounded-2xl transition-all group active:scale-90"
                    title="Previous Video"
                  >
                    <SkipBack className="w-4 h-4 text-zinc-500 group-hover:text-white" />
@@ -765,14 +784,14 @@ export default function Player() {
                      setCurrentIndex(0);
                      setPlayCount(c => c + 1);
                    }}
-                   className="p-4 bg-zinc-900 hover:bg-zinc-800 rounded-[20px] transition-all group active:scale-90"
+                   className="p-3 md:p-4 bg-zinc-900 hover:bg-zinc-800 rounded-2xl transition-all group active:scale-90"
                    title="Restart Playlist"
                  >
                    <RefreshCw className="w-4 h-4 text-zinc-500 group-hover:text-blue-400" />
                  </button>
 
                  <div 
-                   className="p-6 bg-red-600 rounded-[28px] flex items-center justify-center shadow-2xl shadow-red-600/40 active:scale-95 transition-transform cursor-pointer relative group"
+                   className="p-5 md:p-6 bg-red-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-red-600/40 active:scale-95 transition-transform cursor-pointer relative group"
                    onClick={handleRefreshVideo} 
                    title="Restart Current Source"
                  >
@@ -781,7 +800,7 @@ export default function Player() {
 
                  <button 
                    onClick={handleNext}
-                   className="p-4 bg-zinc-900 hover:bg-zinc-800 rounded-[20px] transition-all group active:scale-90"
+                   className="p-3 md:p-4 bg-zinc-900 hover:bg-zinc-800 rounded-2xl transition-all group active:scale-90"
                    title="Next Video"
                  >
                    <SkipForward className="w-4 h-4 text-zinc-500 group-hover:text-white" />
@@ -789,12 +808,12 @@ export default function Player() {
               </div>
             )}
 
-           <div className="flex flex-col gap-2 px-4">
-              <div className="flex items-center justify-between text-[10px] font-black text-zinc-600 uppercase tracking-widest">
-                 <span>Active Node: {channelName}</span>
+           <div className="flex flex-col gap-2 px-2 md:px-4">
+              <div className="flex items-center justify-between text-[10px] md:text-xs font-black text-zinc-600 uppercase tracking-widest">
+                 <span className="truncate max-w-[200px]">{channelName}</span>
                  <Share2 className="w-4 h-4 hover:text-white cursor-pointer transition-colors" />
               </div>
-              <p className="text-[9px] text-zinc-700 font-bold uppercase tracking-tighter">Broadcast Output: 1920x1080 Clean</p>
+              <p className="text-[8px] md:text-[10px] text-zinc-700 font-bold uppercase tracking-tighter">Broadcast Node • Secure Feed</p>
            </div>
         </div>
       </div>
